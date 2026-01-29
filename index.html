@@ -28,7 +28,6 @@
       padding: 0 14px;
     }
 
-    /* Top input bar */
     .bar{
       display:flex;
       gap:10px;
@@ -65,7 +64,6 @@
     }
     .bar button:hover{ filter: brightness(1.05); }
 
-    /* Table */
     .table{
       margin-top:10px;
       border:1px solid var(--line);
@@ -126,7 +124,6 @@
       font-size:12px;
     }
 
-    /* Responsive */
     @media (max-width: 860px){
       .thead, .row{
         grid-template-columns: 110px 110px 170px 1fr;
@@ -155,9 +152,9 @@
 <body>
   <div class="wrap">
     <div class="bar">
-      <label for="valorReceber">Valor que quero receber:</label>
-      <input id="valorReceber" placeholder="50000,00" />
-      <button id="btnCalcular">Calcular</button>
+      <label for="valorReceber">Valor da Passagem:</label>
+      <input id="valorReceber" inputmode="decimal" placeholder="50.000,00" />
+      <button id="btnCalcular" type="button">Calcular</button>
     </div>
 
     <div class="table">
@@ -174,7 +171,7 @@
   <script>
     // Taxas iguais ao print
     const taxas = [
-      { label: "PIX", parcelas: 0, taxa: null },  // sem taxa
+      { label: "PIX", parcelas: 0, taxa: null },
       { label: "1x", parcelas: 1, taxa: 4.40 },
       { label: "2x", parcelas: 2, taxa: 6.50 },
       { label: "3x", parcelas: 3, taxa: 7.55 },
@@ -195,13 +192,20 @@
 
     function parseBRMoney(input){
       if(!input) return 0;
-      // aceita "50.000,00" ou "50000,00" ou "50000.00"
-      const s = String(input).trim()
-        .replace(/\s/g,"")
-        .replace(/\./g,"")
-        .replace(",",".");
-      const n = Number(s);
+      // extrai só números, vírgula e ponto
+      const raw = String(input).trim();
+      // normaliza: remove separador de milhar e usa ponto para decimal
+      const normalized = raw.replace(/\./g, "").replace(",", ".");
+      const n = Number(normalized);
       return Number.isFinite(n) ? n : 0;
+    }
+
+    function formatBRInputCurrency(valueNumber){
+      // mantém formatação pt-BR com 2 casas
+      return valueNumber.toLocaleString("pt-BR", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      });
     }
 
     function brl(n){
@@ -212,51 +216,35 @@
       return n.toLocaleString("pt-BR", { minimumFractionDigits:2, maximumFractionDigits:2 }) + "%";
     }
 
-    function render(valorReceber){
+    // monta a tabela 1x e depois só atualiza os valores (mais rápido e “ao vivo”)
+    function buildTable(){
       elBody.innerHTML = "";
-
-      taxas.forEach(item => {
+      taxas.forEach((item, idx) => {
         const isPix = item.label === "PIX";
-        const taxa = item.taxa; // % ou null
-
-        const valorTotal = isPix ? valorReceber : valorReceber * (1 + (taxa/100));
-        const parcela = item.parcelas > 0 ? (valorTotal / item.parcelas) : valorTotal;
 
         const row = document.createElement("div");
         row.className = "row";
+        row.dataset.idx = String(idx);
 
-        // Parcelas
         const c1 = document.createElement("div");
         c1.className = "parcelas" + (isPix ? " pix" : "");
         c1.textContent = item.label;
         c1.setAttribute("data-label","Parcelas");
 
-        // Taxa
         const c2 = document.createElement("div");
         c2.className = "taxa" + (isPix ? " muted" : "");
-        c2.textContent = isPix ? "—" : percent(taxa);
+        c2.textContent = isPix ? "—" : percent(item.taxa);
         c2.setAttribute("data-label","Taxa (%)");
 
-        // Recebido
         const c3 = document.createElement("div");
         c3.className = "recebido";
-        c3.textContent = brl(valorReceber);
+        c3.textContent = "R$ 0,00";
         c3.setAttribute("data-label","Valor Recebido");
 
-        // Valor (total + parcelas)
         const c4 = document.createElement("div");
         c4.className = "valor";
         c4.setAttribute("data-label","Valor");
-
-        if(isPix){
-          // no print, PIX aparece só como linha sem detalhamento de parcela
-          c4.innerHTML = `<div class="total">${brl(valorTotal)}</div>`;
-        } else {
-          c4.innerHTML = `
-            <div class="total">${brl(valorTotal)}</div>
-            <div class="parcelado">${item.label} R$ ${parcela.toLocaleString("pt-BR", { minimumFractionDigits:2, maximumFractionDigits:2 })} por parcela</div>
-          `;
-        }
+        c4.innerHTML = `<div class="total">R$ 0,00</div>` + (isPix ? "" : `<div class="parcelado">—</div>`);
 
         row.appendChild(c1);
         row.appendChild(c2);
@@ -267,19 +255,62 @@
       });
     }
 
-    function calcular(){
-      const v = parseBRMoney(elValor.value);
-      render(v);
+    function updateValues(valorReceber){
+      const rows = elBody.querySelectorAll(".row");
+      rows.forEach((row) => {
+        const idx = Number(row.dataset.idx);
+        const item = taxas[idx];
+        const isPix = item.label === "PIX";
+
+        const valorTotal = isPix ? valorReceber : valorReceber * (1 + (item.taxa / 100));
+        const parcela = item.parcelas > 0 ? (valorTotal / item.parcelas) : valorTotal;
+
+        // coluna recebido (sempre o que o usuário quer receber)
+        const recebidoEl = row.children[2];
+        recebidoEl.textContent = brl(valorReceber);
+
+        // coluna valor
+        const valorEl = row.children[3];
+        const totalEl = valorEl.querySelector(".total");
+        totalEl.textContent = brl(valorTotal);
+
+        const parceladoEl = valorEl.querySelector(".parcelado");
+        if(parceladoEl){
+          parceladoEl.textContent =
+            `${item.label} R$ ${parcela.toLocaleString("pt-BR", { minimumFractionDigits:2, maximumFractionDigits:2 })} por parcela`;
+        }
+      });
     }
 
-    // Inicializa com um valor padrão do print
-    elValor.value = "50000,00";
-    render(50000);
+    function recalcFromInput({ formatInput } = { formatInput: false }){
+      // lê, calcula e atualiza tabela
+      const v = parseBRMoney(elValor.value);
+      updateValues(v);
 
-    elBtn.addEventListener("click", calcular);
-    elValor.addEventListener("keydown", (e) => {
-      if(e.key === "Enter") calcular();
+      // opcional: formatar o texto digitado como moeda (sem "R$" no input)
+      // isso deixa mais “limpo” e evita bagunça na digitação
+      if(formatInput){
+        // evita travar quando o usuário está apagando
+        if(elValor.value.trim() === "") return;
+        elValor.value = formatBRInputCurrency(v);
+      }
+    }
+
+    // --- Init
+    buildTable();
+    elValor.value = "";
+    recalcFromInput();
+
+    // Atualiza em tempo real enquanto digita
+    elValor.addEventListener("input", () => {
+      recalcFromInput({ formatInput: false });
     });
-  </script>
-</body>
-</html>
+
+    // Ao sair do campo (blur), formata bonitinho
+    elValor.addEventListener("blur", () => {
+      recalcFromInput({ formatInput: true });
+    });
+
+    // Botão ainda funciona (caso queira manter)
+    elBtn.addEventListener("click", () => {
+      recalcFromInput({ formatInput: true
