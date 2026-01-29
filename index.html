@@ -12,7 +12,7 @@
       --header2:#151515;
       --text:#1b1f23;
       --muted:#6b7785;
-      --accent:#476485; /* azul do banner (extraído do logo) */
+      --accent:#476485; /* azul do banner */
       --white:#fff;
     }
     *{box-sizing:border-box}
@@ -28,7 +28,6 @@
       padding: 0 14px;
     }
 
-    /* Brand banner */
     .brand{
       display:flex;
       justify-content:center;
@@ -42,7 +41,6 @@
       display:block;
     }
 
-    /* Top input bar */
     .bar{
       display:flex;
       gap:10px;
@@ -68,7 +66,6 @@
       outline:none;
     }
 
-    /* Table */
     .table{
       margin-top:10px;
       border:1px solid var(--line);
@@ -95,23 +92,13 @@
       background:#fff;
     }
 
-    .parcelas{
-      font-weight:600;
-      color:#2b2b2b;
-    }
-    .parcelas.pix{
-      color: var(--accent);
-    }
+    .parcelas{ font-weight:600; color:#2b2b2b; }
+    .parcelas.pix{ color: var(--accent); }
 
-    .taxa{
-      color:#2b2b2b;
-    }
+    .taxa{ color:#2b2b2b; }
     .taxa.muted{ color: var(--muted); }
 
-    .recebido{
-      color: var(--accent);
-      font-weight:700;
-    }
+    .recebido{ color: var(--accent); font-weight:700; }
 
     .valor{
       display:flex;
@@ -119,30 +106,17 @@
       gap:2px;
       align-items:flex-start;
     }
-    .valor .total{
-      color: var(--muted);
-      font-size:11px;
-    }
-    .valor .parcelado{
-      color: var(--accent);
-      font-weight:700;
-      font-size:12px;
-    }
+    .valor .total{ color: var(--muted); font-size:11px; }
+    .valor .parcelado{ color: var(--accent); font-weight:700; font-size:12px; }
 
-    /* Responsive */
     @media (max-width: 860px){
-      .thead, .row{
-        grid-template-columns: 110px 110px 170px 1fr;
-      }
+      .thead, .row{ grid-template-columns: 110px 110px 170px 1fr; }
     }
     @media (max-width: 640px){
       .bar{ flex-direction:column; align-items:stretch; }
       .bar label{ margin-right:0; }
       .thead{ display:none; }
-      .row{
-        grid-template-columns: 1fr;
-        gap:6px;
-      }
+      .row{ grid-template-columns: 1fr; gap:6px; }
       .row > div{ display:flex; justify-content:space-between; }
       .row > div::before{
         content: attr(data-label);
@@ -157,14 +131,13 @@
 
 <body>
   <div class="wrap">
-    <!-- Banner (coloque o arquivo logo.png na mesma pasta do index.html) -->
     <div class="brand">
       <img src="logo.png" alt="Agência ESV Extremo Oriental" />
     </div>
 
     <div class="bar">
-      <label for="valorReceber">Valor da Passagem:</label>
-      <input id="valorReceber" inputmode="numeric" placeholder="ex: 2.500" />
+      <label for="valorReceber">Valor da Sua Passagem:</label>
+      <input id="valorReceber" inputmode="decimal" placeholder="ex: 2.500,00" />
     </div>
 
     <div class="table">
@@ -179,7 +152,6 @@
   </div>
 
   <script>
-    // Taxas iguais ao print
     const taxas = [
       { label: "PIX", parcelas: 0, taxa: null },
       { label: "1x", parcelas: 1, taxa: 4.40 },
@@ -206,16 +178,47 @@
       return n.toLocaleString("pt-BR", { minimumFractionDigits:2, maximumFractionDigits:2 }) + "%";
     }
 
-    // Máscara: "2500" -> "2.500" (sem R$ e sem decimais)
-    function formatThousandsBR(intNumber){
-      return intNumber.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
+    // Converte texto do input (pt-BR) -> número (float)
+    // Aceita: "2500", "2.500", "2.500,5", "2.500,50", "2500.50"
+    function parseBRDecimal(value){
+      if(!value) return 0;
+
+      const s = String(value).trim();
+
+      // mantém apenas dígitos, ponto e vírgula
+      const cleaned = s.replace(/[^\d.,]/g, "");
+
+      // se tem vírgula, assume vírgula como decimal e remove pontos (milhar)
+      if(cleaned.includes(",")){
+        const noThousands = cleaned.replace(/\./g, "");
+        const normalized = noThousands.replace(",", ".");
+        const n = Number(normalized);
+        return Number.isFinite(n) ? n : 0;
+      }
+
+      // sem vírgula: pode ser "2.500" (milhar) ou "2500.50" (decimal)
+      // Heurística:
+      // - se tiver ponto e depois dele tiver 1-2 dígitos, tratamos como decimal
+      // - senão, tratamos como milhar (remove todos os pontos)
+      if(cleaned.includes(".")){
+        const parts = cleaned.split(".");
+        const last = parts[parts.length - 1] || "";
+        if(last.length === 1 || last.length === 2){
+          const n = Number(cleaned);
+          return Number.isFinite(n) ? n : 0;
+        } else {
+          const n = Number(cleaned.replace(/\./g, ""));
+          return Number.isFinite(n) ? n : 0;
+        }
+      }
+
+      const n = Number(cleaned);
+      return Number.isFinite(n) ? n : 0;
     }
 
-    // Lê input formatado e devolve número (inteiro em reais)
-    function parseMaskedIntBR(value){
-      if(!value) return 0;
-      const digits = String(value).replace(/\D/g, ""); // só números
-      return digits ? parseInt(digits, 10) : 0;
+    // Formata como "2.500,50" (sem R$)
+    function formatBRNoCurrency(n){
+      return n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
     function buildTable(){
@@ -266,10 +269,8 @@
         const valorTotal = isPix ? valorReceber : valorReceber * (1 + (item.taxa / 100));
         const parcela = item.parcelas > 0 ? (valorTotal / item.parcelas) : valorTotal;
 
-        // coluna recebido (sempre o que o usuário quer receber)
         row.children[2].textContent = brl(valorReceber);
 
-        // coluna valor
         const valorEl = row.children[3];
         valorEl.querySelector(".total").textContent = brl(valorTotal);
 
@@ -281,34 +282,40 @@
       });
     }
 
-    function handleLiveInput(){
-      // pega o valor numérico
-      const v = parseMaskedIntBR(elValor.value);
+    // Mantém um “raw” simples pra não quebrar a digitação (especialmente vírgula)
+    let userRaw = "";
 
-      // aplica máscara visual no input, preservando edição
-      // (mantém cursor no final, que é o padrão mais estável pra esse tipo de máscara simples)
-      if(elValor.value){
-        elValor.value = formatThousandsBR(v);
-      }
+    function handleInput(e){
+      const v = e.target.value;
 
-      // atualiza tabela automaticamente
-      updateValues(v);
+      // guarda só dígitos + separadores
+      userRaw = v.replace(/[^\d.,]/g, "");
+
+      // calcula em tempo real (sem formatar agressivamente aqui)
+      // para não atrapalhar o usuário digitando a vírgula/centavos
+      const n = parseBRDecimal(userRaw);
+      updateValues(n);
     }
 
-    // Init: tabela criada, sem valor inicial no input
+    function handleBlur(){
+      // ao sair do campo, aí sim formata bonitinho (com centavos)
+      const n = parseBRDecimal(userRaw || elValor.value);
+      if(n === 0){
+        elValor.value = "";
+        userRaw = "";
+      } else {
+        elValor.value = formatBRNoCurrency(n);
+        userRaw = elValor.value;
+      }
+      updateValues(n);
+    }
+
+    // Init
     buildTable();
     updateValues(0);
 
-    // Cálculo em tempo real (sem botão)
-    elValor.addEventListener("input", handleLiveInput);
-
-    // Ao sair do campo, mantém máscara consistente
-    elValor.addEventListener("blur", () => {
-      const v = parseMaskedIntBR(elValor.value);
-      if(v === 0) elValor.value = ""; // se zerar/apagar, volta a ficar vazio
-      else elValor.value = formatThousandsBR(v);
-      updateValues(v);
-    });
+    elValor.addEventListener("input", handleInput);
+    elValor.addEventListener("blur", handleBlur);
   </script>
 </body>
 </html>
