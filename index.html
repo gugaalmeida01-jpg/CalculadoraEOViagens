@@ -209,3 +209,106 @@
     // Máscara: "2500" -> "2.500" (sem R$ e sem decimais)
     function formatThousandsBR(intNumber){
       return intNumber.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
+    }
+
+    // Lê input formatado e devolve número (inteiro em reais)
+    function parseMaskedIntBR(value){
+      if(!value) return 0;
+      const digits = String(value).replace(/\D/g, ""); // só números
+      return digits ? parseInt(digits, 10) : 0;
+    }
+
+    function buildTable(){
+      elBody.innerHTML = "";
+      taxas.forEach((item, idx) => {
+        const isPix = item.label === "PIX";
+
+        const row = document.createElement("div");
+        row.className = "row";
+        row.dataset.idx = String(idx);
+
+        const c1 = document.createElement("div");
+        c1.className = "parcelas" + (isPix ? " pix" : "");
+        c1.textContent = item.label;
+        c1.setAttribute("data-label","Parcelas");
+
+        const c2 = document.createElement("div");
+        c2.className = "taxa" + (isPix ? " muted" : "");
+        c2.textContent = isPix ? "—" : percent(item.taxa);
+        c2.setAttribute("data-label","Taxa (%)");
+
+        const c3 = document.createElement("div");
+        c3.className = "recebido";
+        c3.textContent = "R$ 0,00";
+        c3.setAttribute("data-label","Valor Recebido");
+
+        const c4 = document.createElement("div");
+        c4.className = "valor";
+        c4.setAttribute("data-label","Valor");
+        c4.innerHTML = `<div class="total">R$ 0,00</div>` + (isPix ? "" : `<div class="parcelado">—</div>`);
+
+        row.appendChild(c1);
+        row.appendChild(c2);
+        row.appendChild(c3);
+        row.appendChild(c4);
+
+        elBody.appendChild(row);
+      });
+    }
+
+    function updateValues(valorReceber){
+      const rows = elBody.querySelectorAll(".row");
+      rows.forEach((row) => {
+        const idx = Number(row.dataset.idx);
+        const item = taxas[idx];
+        const isPix = item.label === "PIX";
+
+        const valorTotal = isPix ? valorReceber : valorReceber * (1 + (item.taxa / 100));
+        const parcela = item.parcelas > 0 ? (valorTotal / item.parcelas) : valorTotal;
+
+        // coluna recebido (sempre o que o usuário quer receber)
+        row.children[2].textContent = brl(valorReceber);
+
+        // coluna valor
+        const valorEl = row.children[3];
+        valorEl.querySelector(".total").textContent = brl(valorTotal);
+
+        const parceladoEl = valorEl.querySelector(".parcelado");
+        if(parceladoEl){
+          parceladoEl.textContent =
+            `${item.label} R$ ${parcela.toLocaleString("pt-BR", { minimumFractionDigits:2, maximumFractionDigits:2 })} por parcela`;
+        }
+      });
+    }
+
+    function handleLiveInput(){
+      // pega o valor numérico
+      const v = parseMaskedIntBR(elValor.value);
+
+      // aplica máscara visual no input, preservando edição
+      // (mantém cursor no final, que é o padrão mais estável pra esse tipo de máscara simples)
+      if(elValor.value){
+        elValor.value = formatThousandsBR(v);
+      }
+
+      // atualiza tabela automaticamente
+      updateValues(v);
+    }
+
+    // Init: tabela criada, sem valor inicial no input
+    buildTable();
+    updateValues(0);
+
+    // Cálculo em tempo real (sem botão)
+    elValor.addEventListener("input", handleLiveInput);
+
+    // Ao sair do campo, mantém máscara consistente
+    elValor.addEventListener("blur", () => {
+      const v = parseMaskedIntBR(elValor.value);
+      if(v === 0) elValor.value = ""; // se zerar/apagar, volta a ficar vazio
+      else elValor.value = formatThousandsBR(v);
+      updateValues(v);
+    });
+  </script>
+</body>
+</html>
