@@ -1,0 +1,100 @@
+index.html
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Calculadora de Parcelas</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 0; padding: 24px; }
+    .card { max-width: 720px; margin: 0 auto; padding: 20px; border: 1px solid #e6e6e6; border-radius: 16px; }
+    h1 { margin: 0 0 12px; font-size: 20px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    label { display: block; font-size: 12px; margin-bottom: 6px; color: #333; }
+    input { width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 10px; font-size: 14px; }
+    .row { margin-top: 12px; }
+    button { width: 100%; padding: 12px 14px; border: 0; border-radius: 12px; font-size: 14px; cursor: pointer; }
+    .btn { background: #111; color: #fff; }
+    .muted { color: #666; font-size: 12px; margin-top: 8px; }
+    .result { margin-top: 16px; padding: 14px; border-radius: 12px; background: #f7f7f7; }
+    .result strong { font-size: 16px; }
+    .mono { font-variant-numeric: tabular-nums; }
+    @media (max-width: 640px){ .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Calculadora de Parcelas</h1>
+
+    <div class="grid">
+      <div>
+        <label for="pv">Valor do financiamento (R$)</label>
+        <input id="pv" inputmode="decimal" placeholder="Ex.: 10000" />
+      </div>
+      <div>
+        <label for="n">Número de parcelas</label>
+        <input id="n" inputmode="numeric" placeholder="Ex.: 12" />
+      </div>
+      <div>
+        <label for="i">Juros ao mês (%)</label>
+        <input id="i" inputmode="decimal" placeholder="Ex.: 2,5" />
+      </div>
+      <div>
+        <label for="entrada">Entrada (R$) (opcional)</label>
+        <input id="entrada" inputmode="decimal" placeholder="Ex.: 1000" />
+      </div>
+    </div>
+
+    <div class="row">
+      <button class="btn" id="calc">Calcular</button>
+      <div class="muted">Modelo: parcelas fixas (Price). Se juros = 0, faz divisão simples.</div>
+    </div>
+
+    <div class="result" id="out" style="display:none;"></div>
+  </div>
+
+  <script>
+    const brMoney = (v) =>
+      v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+    const parseBR = (s) => {
+      if (!s) return 0;
+      // aceita "1.234,56" ou "1234.56"
+      const t = String(s).trim().replace(/\./g, "").replace(",", ".");
+      const n = Number(t);
+      return Number.isFinite(n) ? n : 0;
+    };
+
+    document.getElementById("calc").addEventListener("click", () => {
+      const pvRaw = parseBR(document.getElementById("pv").value);
+      const entrada = parseBR(document.getElementById("entrada").value);
+      const n = Math.max(1, Math.floor(parseBR(document.getElementById("n").value)));
+      const iPct = parseBR(document.getElementById("i").value);
+
+      const pv = Math.max(0, pvRaw - entrada);
+      const i = Math.max(0, iPct) / 100;
+
+      let pmt = 0;
+      if (pv === 0) pmt = 0;
+      else if (i === 0) pmt = pv / n;
+      else {
+        // Price: PMT = PV * i / (1 - (1+i)^-n)
+        pmt = pv * i / (1 - Math.pow(1 + i, -n));
+      }
+
+      const total = pmt * n + entrada;
+      const jurosTotal = total - pvRaw;
+
+      const out = document.getElementById("out");
+      out.style.display = "block";
+      out.innerHTML = `
+        <div><strong class="mono">${brMoney(pmt)}</strong> por mês</div>
+        <div class="muted mono">Parcelas: ${n} | Juros: ${iPct.toLocaleString("pt-BR")} % a.m.</div>
+        <hr style="border:none;border-top:1px solid #e6e6e6;margin:12px 0;">
+        <div class="mono">Total pago: <strong>${brMoney(total)}</strong></div>
+        <div class="mono">Juros totais (aprox.): <strong>${brMoney(jurosTotal)}</strong></div>
+      `;
+    });
+  </script>
+</body>
+</html>
