@@ -298,7 +298,7 @@
 
     // --- Init
     buildTable();
-    elValor.value = "";
+    elValor.value = "50.000,00";
     recalcFromInput();
 
     // Atualiza em tempo real enquanto digita
@@ -313,4 +313,17 @@
 
     // Botão ainda funciona (caso queira manter)
     elBtn.addEventListener("click", () => {
-      recalcFromInput({ formatInput: true
+      recalcFromInput({ formatInput: true });
+    });
+
+    // Enter também calcula/formata
+    elValor.addEventListener("keydown", (e) => {
+      if(e.key === "Enter"){
+        e.preventDefault();
+        recalcFromInput({ formatInput: true });
+        elValor.blur();
+      }
+    });
+  </script>
+</body>
+</html>
