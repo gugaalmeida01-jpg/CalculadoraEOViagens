@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Calculadora de Parcelamento</title>
+  <style>
+    :root{
+      --bg:#f3f5f7;
+      --line:#d9e0e6;
+      --header:#2b2b2b;
+      --header2:#151515;
+      --text:#1b1f23;
+      --muted:#6b7785;
+      --accent:#476485; /* azul do banner (extraído do logo) */
+      --white:#fff;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    .wrap{
+      max-width: 1240px;
+      margin: 18px auto;
+      padding: 0 14px;
+    }
+
+    /* Brand banner */
+    .brand{
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      margin: 6px 0 12px;
+    }
+    .brand img{
+      max-width: 520px;
+      width: 100%;
+      height: auto;
+      display:block;
+    }
+
+    /* Top input bar */
+    .bar{
+      display:flex;
+      gap:10px;
+      align-items:center;
+      background: var(--white);
+      border:1px solid var(--line);
+      border-radius:6px;
+      padding:10px;
+    }
+    .bar label{
+      font-size:13px;
+      color: var(--text);
+      white-space:nowrap;
+      margin-right:6px;
+    }
+    .bar input{
+      flex:1;
+      height:34px;
+      border:1px solid var(--line);
+      border-radius:4px;
+      padding: 0 10px;
+      font-size:14px;
+      outline:none;
+    }
+
+    /* Table */
+    .table{
+      margin-top:10px;
+      border:1px solid var(--line);
+      border-radius:6px;
+      overflow:hidden;
+      background: var(--white);
+    }
+    .thead{
+      display:grid;
+      grid-template-columns: 140px 140px 220px 1fr;
+      padding: 8px 12px;
+      color:#fff;
+      font-size:12px;
+      font-weight:600;
+      background: linear-gradient(90deg, var(--header2), var(--header));
+    }
+    .row{
+      display:grid;
+      grid-template-columns: 140px 140px 220px 1fr;
+      padding: 10px 12px;
+      border-top:1px solid var(--line);
+      font-size:13px;
+      align-items:center;
+      background:#fff;
+    }
+
+    .parcelas{
+      font-weight:600;
+      color:#2b2b2b;
+    }
+    .parcelas.pix{
+      color: var(--accent);
+    }
+
+    .taxa{
+      color:#2b2b2b;
+    }
+    .taxa.muted{ color: var(--muted); }
+
+    .recebido{
+      color: var(--accent);
+      font-weight:700;
+    }
+
+    .valor{
+      display:flex;
+      flex-direction:column;
+      gap:2px;
+      align-items:flex-start;
+    }
+    .valor .total{
+      color: var(--muted);
+      font-size:11px;
+    }
+    .valor .parcelado{
+      color: var(--accent);
+      font-weight:700;
+      font-size:12px;
+    }
+
+    /* Responsive */
+    @media (max-width: 860px){
+      .thead, .row{
+        grid-template-columns: 110px 110px 170px 1fr;
+      }
+    }
+    @media (max-width: 640px){
+      .bar{ flex-direction:column; align-items:stretch; }
+      .bar label{ margin-right:0; }
+      .thead{ display:none; }
+      .row{
+        grid-template-columns: 1fr;
+        gap:6px;
+      }
+      .row > div{ display:flex; justify-content:space-between; }
+      .row > div::before{
+        content: attr(data-label);
+        color: var(--muted);
+        font-weight:600;
+        margin-right:12px;
+      }
+      .valor{ align-items:flex-end; }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <!-- Banner (coloque o arquivo logo.png na mesma pasta do index.html) -->
+    <div class="brand">
+      <img src="logo.png" alt="Agência ESV Extremo Oriental" />
+    </div>
+
+    <div class="bar">
+      <label for="valorReceber">Valor que quero receber:</label>
+      <input id="valorReceber" inputmode="numeric" placeholder="ex: 2.500" />
+    </div>
+
+    <div class="table">
+      <div class="thead">
+        <a>Parcelas</a>
+        <a>Taxa (%)</a>
+        <a>Valor Recebido</a>
+        <a>Valor</a>
+      </div>
+      <div id="tbody"></div>
+    </div>
+  </div>
+
+  <script>
+    // Taxas iguais ao print
+    const taxas = [
+      { label: "PIX", parcelas: 0, taxa: null },
+      { label: "1x", parcelas: 1, taxa: 4.40 },
+      { label: "2x", parcelas: 2, taxa: 6.50 },
+      { label: "3x", parcelas: 3, taxa: 7.55 },
+      { label: "4x", parcelas: 4, taxa: 8.60 },
+      { label: "5x", parcelas: 5, taxa: 9.70 },
+      { label: "6x", parcelas: 6, taxa: 10.80 },
+      { label: "7x", parcelas: 7, taxa: 14.50 },
+      { label: "8x", parcelas: 8, taxa: 15.60 },
+      { label: "9x", parcelas: 9, taxa: 16.80 },
+      { label: "10x", parcelas: 10, taxa: 17.95 },
+      { label: "11x", parcelas: 11, taxa: 18.90 },
+      { label: "12x", parcelas: 12, taxa: 19.90 }
+    ];
+
+    const elValor = document.getElementById("valorReceber");
+    const elBody = document.getElementById("tbody");
+
+    function brl(n){
+      return n.toLocaleString("pt-BR", { style:"currency", currency:"BRL" });
+    }
+    function percent(n){
+      return n.toLocaleString("pt-BR", { minimumFractionDigits:2, maximumFractionDigits:2 }) + "%";
+    }
+
+    // Máscara: "2500" -> "2.500" (sem R$ e sem decimais)
+    function formatThousandsBR(intNumber){
+      return intNumber.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
